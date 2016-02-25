@@ -17,3 +17,6 @@ obj
 *.iobj
 *.ipdb
 *.exe
+bin/*
+.DS_Store
+.idea/
