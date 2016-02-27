@@ -12,27 +12,17 @@ void startTracking();
 void findSizeOfImage(Mat mat);
 void checkAltitude(int maxAltitudeAllowed);
 
-ARDrone myDrone;
-
 int main(int argc, char *argv[]){
 
-    if (!myDrone.open()){
-        cout << "Failed to open connection to the drone." << endl;
-        cout << "Check for WIFI connection" << endl;
-        return -1;
-    }
-
-    // INFO: printing battery percentage
-    std::cout << "Battery = " << myDrone.getBatteryPercentage() << "%" << std::endl;
-
     startTracking();
-
-    myDrone.close();
+    destroyAllWindows();
     return 0;
 }
 
 
 void startTracking(){
+
+    VideoCapture cap(0); // open the default camera
 
     // keyboard input made when user is on application window
     int keyboard;
@@ -49,20 +39,16 @@ void startTracking(){
     // structuring element for morphological transformation
     // I will use default 3*3 matrix
     // TEST: the use of {3,3}, could be wrong
-    Mat SE = getStructuringElement(MORPH_RECT, {3,3});
+    Mat SE = getStructuringElement(MORPH_RECT, {5,5});
 
     // main processing of the frames from the camera and detection
     do{
         keyboard = waitKey(30);
 
-        if ( keyboard == ' '){
-            if (myDrone.onGround())
-                myDrone.takeoff();
-            else
-                myDrone.landing();
-        }
 
-        frame = myDrone.getImage();
+        cap.read(frame);
+        resize(frame, frame, Size(640,360));
+
         imshow("Camera of my ARDrone", frame);
 
         // TODO: should I actually blure it, when I am going to convert it into HSV?
@@ -75,7 +61,8 @@ void startTracking(){
 
         // MUST: set correct HSV values
         // now find binary image using inRange function of openCV
-        inRange(frameInHSV, {1,2,3}, {1,2,3}, binary);
+        inRange(frameInHSV, Scalar(200,122,0), Scalar(255,255,255), binary);
+
         imshow("binay", binary);
 
         // TEST: repeated 2 times, TEST with 1

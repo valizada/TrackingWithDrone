@@ -6,8 +6,9 @@ set(OpenCV_INCLUDE_DIRS /usr/local/opt/opencv3/include)
 set(CMAKE_EXE_LINKER_FLAGS -L/usr/local/opt/opencv3/lib)
 
 set(SOURCE_FILES
+        src/trackingCamNew.cpp
 #        src/hsvValues.cpp
-        src/tracking.cpp
+#        src/tracking.cpp
 #        src/trackingCam.cpp
         src/ardrone/ardrone.cpp
         src/ardrone/ardrone.h
