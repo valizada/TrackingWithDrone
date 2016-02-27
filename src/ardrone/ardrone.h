@@ -51,8 +51,8 @@
 #include <math.h>
 
 // OpenCV 1.0
-//#include <opencv/cv.h>
-//#include <opencv/highgui.h>
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
 
 // OpenCV 2.0
 #include <opencv2/opencv.hpp>

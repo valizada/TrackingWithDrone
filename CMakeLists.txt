@@ -1,12 +1,14 @@
 cmake_minimum_required(VERSION 3.3)
-project(sample_tracking)
+project(tracking)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(OpenCV_INCLUDE_DIRS /usr/local/opt/opencv3/include)
 set(CMAKE_EXE_LINKER_FLAGS -L/usr/local/opt/opencv3/lib)
 
 set(SOURCE_FILES
-        samples/sample_tracking.cpp
+#        src/hsvValues.cpp
+        src/tracking.cpp
+#        src/trackingCam.cpp
         src/ardrone/ardrone.cpp
         src/ardrone/ardrone.h
         src/ardrone/command.cpp
@@ -20,9 +22,12 @@ set(SOURCE_FILES
 
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-add_executable(sample_tracking ${SOURCE_FILES})
+add_executable(tracking ${SOURCE_FILES})
 
-target_link_libraries(sample_tracking -lm  -lpthread -lavutil -lavformat
+target_link_libraries(tracking -lm
+        -lpthread
+        -lavutil
+        -lavformat
         -lavcodec
         -lswscale
         -lopencv_calib3d
