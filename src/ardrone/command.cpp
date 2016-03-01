@@ -78,9 +78,14 @@ int ARDrone::initCommand(void)
         sockCommand.sendf("AT*CONFIG=%d,\"control:euler_angle_max\",\"%f\"\r", ++seq, 12.0 * DEG_TO_RAD);
         msleep(100);
 
-        // Set maximum altitude [mm]
+        // Set maximum altitude [mm] 2m
         sockCommand.sendf("AT*CONFIG_IDS=%d,\"%s\",\"%s\",\"%s\"\r", ++seq, ARDRONE_SESSION_ID, ARDRONE_PROFILE_ID, ARDRONE_APPLOCATION_ID);
-        sockCommand.sendf("AT*CONFIG=%d,\"control:altitude_max\",\"%d\"\r", ++seq, 3000);
+        sockCommand.sendf("AT*CONFIG=%d,\"control:altitude_max\",\"%d\"\r", ++seq, 1700);
+        msleep(100);
+
+        // flying_mode is set to FreeFlight mode
+        sockCommand.sendf("AT*CONFIG_IDS=%d,\"%s\",\"%s\",\"%s\"\r", ++seq, ARDRONE_SESSION_ID, ARDRONE_PROFILE_ID, ARDRONE_APPLOCATION_ID);
+        sockCommand.sendf("AT*CONFIG=%d,\"control:flying_mode\",\"%d\"\r", ++seq, 0);
         msleep(100);
 
         // Bitrate control mode
