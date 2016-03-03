@@ -1,5 +1,5 @@
 //
-// Created by Fizuli Valizada on 27/02/2016.
+// Created by Fizuli Valizada
 //
 
 
@@ -16,15 +16,12 @@ void checkAltitude(int maxAltitudeAllowed);
 
 // velocities
 // vx is the depth, so moving inside of the image
-double vx = 0;
 // vy is rotating to left and right
-double vy = 0;
 // vz is moving horizontally
-double vz = 0;
 // vr rotational speed
-double vr = 0;
+double vx = 0, vy = 0, vz = 0, vr = 0;
 // this is used to adjust movement, PID coefficient
-const double cooffecient = 0.004;
+const double cooffecient = 0.005;
 ARDrone myDrone;
 
 int main(int argc, char *argv[]) {
@@ -40,9 +37,7 @@ int main(int argc, char *argv[]) {
 
 //    myDrone.setFlatTrim();
 //    myDrone.setCalibration(0);
-
     startTracking();
-
 //    destroyAllWindows();
     myDrone.close();
     return 0;
@@ -51,15 +46,7 @@ int main(int argc, char *argv[]) {
 // keyboard input made when user is on application window
 int keyboard;
 // frame from the camera image
-Mat frame;
-// blured image
-Mat frameBlured;
-// frame converted into the HSV colour space
-Mat frameInHSV;
-// this matrix is used to store binary image
-Mat binary;
-// this matrix is used yo do morphological transformations on the binary image
-Mat morpohology;
+Mat frame, frameBlured, frameInHSV, binary, morpohology;
 // structuring element for morphological transformation
 // I will use default 3*3 matrix
 // for closing
@@ -81,39 +68,43 @@ void startTracking() {
                 myDrone.landing();
         }
 
-        if (keyboard == 't' || keyboard == 'T') track = !track;
-
         frame = myDrone.getImage();
-//        imshow("Camera of my ARDrone", frame);
+        // imshow("Camera of my ARDrone", frame);
 
+        if (keyboard == 't' || keyboard == 'T') {
+            track = !track;
+            putText(frame, track ? "TRACKING" : "NOT TRACKING", Point(7, 12), FONT_HERSHEY_SIMPLEX, 0.5,
+                    (track) ? Scalar(0, 0, 255) : Scalar(0, 255, 0), 1, LINE_AA);
+        }
+
+        // blured image
         GaussianBlur(frame, frameBlured, Size(5, 5), 0, 0);
-//        imshow("Gaussian blured", frameBlured);
+        // imshow("Gaussian blured", frameBlured);
 
+        // frame converted into the HSV colour space
         cvtColor(frameBlured, frameInHSV, CV_BGR2HSV_FULL);
-//        imshow("Image in HSV", frameInHSV);
+        // imshow("Image in HSV", frameInHSV);
 
         // now find binary image using inRange function of openCV
+        // Binary matrix is used to store binary image
         inRange(frameInHSV, Scalar(250, 129, 0), Scalar(255, 255, 255), binary);
-
-//        imshow("binary", binary);
+        // imshow("binary", binary);
 
         // TEST: repeated 2 times, TEST with 1
         // TODO: consider Top Hat, black hat operations instead of closing
+        // morpohology is used to do morphological transformations on the binary image
         morphologyEx(binary, morpohology, MORPH_CLOSE, SE, Point(-1, -1), 2);
         imshow("closing 2 times", morpohology);
-
 
         // getting contours from the binary after morphology by using
         // void findContours(InputOutputArray image, OutputArrayOfArrays contours,
         // int mode, int method, Point offset=Point())
-
-        // lets create OutputArrayOfArrays to hold all the points
+        // Lets create OutputArrayOfArrays to hold all the points
         vector<vector<Point>> contours;
         // TODO: should check for mode and method
         findContours(morpohology, contours, CV_RETR_CCOMP, CHAIN_APPROX_SIMPLE);
 
         unsigned long numberOfContours = contours.size();
-
         // now let's loop through each and every contour set
         // eliminate some given our criteria, which I will indicate
         // above each condition and find biggest square contour to detect
@@ -123,12 +114,6 @@ void startTracking() {
 
         cout << "START |" << "num of contours: " << numberOfContours << endl;
         for (size_t i = 0; i < numberOfContours; i++) {
-
-            // first lets eliminate very small ones
-            // our image is 360*640 = 230400 pixels, So I wont consider any
-            // objects with less than 10 000 pixels, which is around 4% of image
-            // subject to change
-
             // When using contourArea we should define Oriented area flag as well,
             // If it is true, the function returns a signed area value,
             // depending on the contour orientation (clockwise or counter-clockwise).
@@ -137,7 +122,10 @@ void startTracking() {
             // absolute value is returned.
             double areaOfContour = contourArea(contours[i], false);
 
-            // which will give approx area, if not change aproxArea variable name too
+            // first lets eliminate very small ones
+            // our image is 360*640 = 230400 pixels, So I wont consider any
+            // objects with less than 10 000 pixels, which is around 4% of image
+            // subject to change
             if (areaOfContour < 300) continue;
 
             // then I will try to approximate contour,
@@ -157,7 +145,6 @@ void startTracking() {
 
 //            cout << "APPROX CORNERS SIZE = " << approxArea.size() << endl;
             if (approxArea.size() >= 4 && approxArea.size() <= 7) {
-
                 // let's find aspect ratio first
                 Rect rectangle = boundingRect(approxArea);
 
@@ -197,24 +184,20 @@ void startTracking() {
                     indexOfContour = i;
                     resultApproxArea = approxArea;
                     maxArea = areaOfContour;
-//                    cout << "Max area: " << maxArea << endl;
+                    // cout << "Max area: " << maxArea << endl;
                 }
-//                cout << "Max area: " << maxArea << " contour area: " << areaOfContour << endl;
-
+                // cout << "Max area: " << maxArea << " contour area: " << areaOfContour << endl;
             }
         } // for = looping over all the contours
 
         // if contour passed all the tests, so it is detected
         if (indexOfContour >= 0) {
-//            cout << "index of contour " << indexOfContour << endl;
             // let's find center of the object by using Moments
             Moments moment = moments(contours[indexOfContour], true);
-//            Moments moment = moments(resultApproxArea, true);
 
             double marker_y = (int) (moment.m01 / moment.m00);
             double marker_x = (int) (moment.m10 / moment.m00);
             Rect rect = boundingRect(contours[indexOfContour]);
-//            Rect rect = boundingRect(resultApproxArea);
             rectangle(frame, rect, Scalar(0, 255, 0));
 
             if (track) {
