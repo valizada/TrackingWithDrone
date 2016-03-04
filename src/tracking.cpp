@@ -24,6 +24,7 @@ double vx = 0, vy = 0, vz = 0, vr = 0;
 const double cooffecient = 0.005;
 ARDrone myDrone;
 
+bool objcetFound = false;
 int main(int argc, char *argv[]) {
 
     if (!myDrone.open()) {
@@ -56,6 +57,42 @@ Mat SE = getStructuringElement(MORPH_RECT, {5, 5});
 void startTracking() {
     double maxArea = 0;
 
+    static cv::Mat1f prediction;
+    // Kalman filter
+    KalmanFilter kalman(4, 2, 0);
+
+    // Sampling time [s]
+    const double dt = 1.0;
+
+    // Transition matrix (x, y, vx, vy)
+    cv::Mat1f A(4, 4);
+    A << 1.0, 0.0,  dt, 0.0,
+            0.0, 1.0, 0.0,  dt,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0;
+    kalman.transitionMatrix = A;
+
+    // Measurement matrix (x, y)
+    cv::Mat1f H(2, 4);
+    H << 1, 0, 0, 0,
+            0, 1, 0, 0;
+    kalman.measurementMatrix = H;
+
+    // Process noise covariance (x, y, vx, vy)
+    cv::Mat1f Q(4, 4);
+    Q << 1e-5,  0.0,  0.0,  0.0,
+            0.0, 1e-5,  0.0,  0.0,
+            0.0,  0.0, 1e-5,  0.0,
+            0.0,  0.0,  0.0, 1e-5;
+    kalman.processNoiseCov = Q;
+
+    // Measurement noise covariance (x, y)
+    cv::Mat1f R(2, 2);
+    R << 1e-1,  0.0,
+            0.0, 1e-1;
+    kalman.measurementNoiseCov = R;
+
+    int count = 0;
     static bool track = false;
     // main processing of the frames from the camera and detection
     do {
@@ -70,12 +107,9 @@ void startTracking() {
 
         frame = myDrone.getImage();
         // imshow("Camera of my ARDrone", frame);
-
-        if (keyboard == 't' || keyboard == 'T') {
-            track = !track;
-            putText(frame, track ? "TRACKING" : "NOT TRACKING", Point(7, 12), FONT_HERSHEY_SIMPLEX, 0.5,
-                    (track) ? Scalar(0, 0, 255) : Scalar(0, 255, 0), 1, LINE_AA);
-        }
+        objcetFound = false;
+        count ++;
+        if (keyboard == 't' || keyboard == 'T') track = !track;
 
         // blured image
         GaussianBlur(frame, frameBlured, Size(5, 5), 0, 0);
@@ -112,7 +146,7 @@ void startTracking() {
 
         vector<Point> resultApproxArea;
 
-        cout << "START |" << "num of contours: " << numberOfContours << endl;
+        cout << "START" << endl;
         for (size_t i = 0; i < numberOfContours; i++) {
             // When using contourArea we should define Oriented area flag as well,
             // If it is true, the function returns a signed area value,
@@ -173,8 +207,8 @@ void startTracking() {
                 cout << "solidity: " << solidity << " where area: " << areaOfContour << " convex area: " <<
                 convexHullArea << endl;
 //                // if solidity is too small let's skip this contour
-                if (solidity < 0.9) {
-//                    cout << "NOT PASS SOLIDITY" << endl;
+                if (solidity < 0.7) {
+                    cout << "NOT PASS SOLIDITY" << endl;
                     continue;
                 }
                 // it passes aspect ratio and solidity tests,
@@ -190,8 +224,14 @@ void startTracking() {
             }
         } // for = looping over all the contours
 
+        int centerY = morpohology.rows / 2;
+        int centerX = morpohology.cols / 2;
+
         // if contour passed all the tests, so it is detected
         if (indexOfContour >= 0) {
+            objcetFound = true;
+            cout << "MAKE COUNT 0" << endl;
+            count = 0;
             // let's find center of the object by using Moments
             Moments moment = moments(contours[indexOfContour], true);
 
@@ -203,46 +243,103 @@ void startTracking() {
             if (track) {
                 // center coordinates of the image
                 // TODO: should be calculated just once
-                int centerY = morpohology.rows / 2;
-                int centerX = morpohology.cols / 2;
-
                 // let's draw this center of the object to be tracked
                 circle(frame, Point(marker_x, marker_y), 1, Scalar(0, 255, 0));
                 // let's draw this center of the image
                 circle(frame, Point(centerX, centerY), 1, Scalar(0, 255, 0));
 
-                if (maxArea < 30000)
+//                // Measurements
+//                cv::Mat measurement = (Mat1f(2, 1) << marker_x, marker_y);
+//                // Correction
+//                cv::Mat estimated = kalman.correct(measurement);
+
+                double altitude = myDrone.getAltitude();
+                if (altitude >= 1.7){
+                    putText(frame, "TOO HIGH HIGH, MOVING DOWN", Point(50, 100), FONT_HERSHEY_SIMPLEX, 0.5,
+                            (track) ? Scalar(0, 0, 255) : Scalar(0, 255, 0), 1, LINE_AA);
+                    cout << "TOO HIGH, ALTITUDE IS: " <<   myDrone.getAltitude() << endl;
+                    myDrone.move3D(0, 0, -0.1, 0);
+                    continue;
+                }
+
+                if (maxArea < 30000){
                     vx = 0.13;
+                    vy = 0.0;
+                    vz = 0.005 * (centerY - marker_y);
+                    vr = 0.006 * (centerX - marker_x);
+
+                    putText(frame, "WITHOUT KALMAN", Point(30, 250), FONT_HERSHEY_SIMPLEX, 0.5,
+                            (track) ? Scalar(0, 0, 255) : Scalar(0, 255, 0), 1, LINE_AA);
+                    cout << "WITHOUT KALMAN" << endl;
+                    cout << "centerX: " << centerX << " centerY: " << centerY << endl;
+                    cout << "marker_x: " << marker_x << " marker_y: " << marker_y << endl;
+                    cout << "tracks: vx = " << vx << " vy = " << vy << " vz = " << vz
+                    << " vr = " << vr << endl;
+                    cout << "Current altitude is: " << myDrone.getAltitude() << endl;
+                    myDrone.move3D(vx, vy, vz, vr);
+                }
                 else {
-                    putText(frame, "DANGER MOVING BACK", Point(10, 20), FONT_HERSHEY_SIMPLEX, 0.5,
+                    putText(frame, "DANGER MOVING BACK", Point(30, 100), FONT_HERSHEY_SIMPLEX, 0.5,
                             (track) ? Scalar(0, 0, 255) : Scalar(0, 255, 0), 1, LINE_AA);
                     vx = -0.1;
+                    vy = 0.0;
+                    vz = 0.005 * (centerY - marker_y);
+                    vr = 0.005 * (centerX - marker_x);
+                    myDrone.move3D(vx, vy, vz, vr);
                 }
-                vy = 0.0;
-                vz = 0.004 * (centerY - marker_y);
-                vr = 0.005 * (centerX - marker_x);
-                cout << "centerX: " << centerX << " centerY: " << centerY << endl;
-                cout << "marker_x: " << marker_x << " marker_y: " << marker_y << endl;
-                cout << "tracks: vx = " << vx << " vy = " << vy << " vz = " << vz
-                << " vr = " << vr << endl;
-                cout << "Current altitude is: " << myDrone.getAltitude() << endl;
-                if (myDrone.getAltitude() >= 2)
-                    myDrone.move3D(0, 0, -0.1, 0);
-
-                myDrone.move3D(vx, vy, vz, vr);
             }
         } //if : checking if object is found
-        else {
-            // every time it does not find anything let's rotate it a bit
-            // MUST: to be changed after implementing Kalman filterin
-//            if (track)
-//                myDrone.move3D(0, 0, 0, 0.2);
+
+
+        // Prediction
+//        prediction = kalman.predict();
+//        int radius = 1e+3 * kalman.errorCovPre.at<float>(0, 0);
+
+
+//        circle(frame, Point(prediction(0, 0), prediction(0, 1)), 1, Scalar(255, 0, 0));
+
+//        cout << "KALMAN PREDICTION RESULT: " << "x: " << prediction(0, 0) << " y: " << prediction(0, 1) << endl;
+
+        if (!objcetFound && track && count >= 25){
+            count = 0;
+//            cout << "WITH KALMAN" << endl;
+//            putText(frame, "WITH KALMAN" , Point(30, 250), FONT_HERSHEY_SIMPLEX, 0.5,
+//                    (track) ? Scalar(0, 0, 255) : Scalar(0, 255, 0), 1, LINE_AA);
+//
+//            if (prediction(0,1) > 500 || prediction(0,1) <= 0
+//                    || prediction(0,0) > 300 || prediction(0,0) <= 0){
+//                prediction(0,0) = 0;
+//                prediction(0,1) = 0;
+//            }
+//
+//            if(prediction(0, 1) != 0 && prediction(0, 0) != 0){
+//                vx = 0.13;
+//                vy = 0.0;
+//                vz = 0.003 * (centerY - prediction(0, 1));
+//                vr = 0.003 * (centerX - prediction(0, 0));
+//
+//                cout << "centerX: " << centerX << " centerY: " << centerY << endl;
+//                cout << "marker_x: " << prediction(0, 1) << " marker_y: " << prediction(0, 0) << endl;
+//                cout << "tracks: vx = " << vx << " vy = " << vy << " vz = " << vz
+//                << " vr = " << vr << endl;
+//
+//                cout << "Current altitude is: " << myDrone.getAltitude() << endl;
+//                myDrone.move3D(vx, vy, vz, vr);
+//            }
+            // MUST: consider moving backwards
+            myDrone.move3D(0, 0, 0 , 0.36);
         }
+
+        putText(frame, track ? "TRACKING" : "NOT TRACKING", Point(7, 12), FONT_HERSHEY_SIMPLEX, 0.5,
+                (track) ? Scalar(0, 0, 255) : Scalar(0, 255, 0), 1, LINE_AA);
 
         imshow("result", frame);
         maxArea = 0;
 
-        cout << "END" << endl;
+        if (track)
+            cout << "TRACK ON" << endl;
+        else cout << "TRACK OFF" << endl;
+        cout << "END count is: " << count << endl;
     } while ((char) keyboard != 'q' && (char) keyboard != 27);
 }
 
