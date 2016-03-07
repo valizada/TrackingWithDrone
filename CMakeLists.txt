@@ -10,6 +10,12 @@ set(SOURCE_FILES
 #        src/hsvValues.cpp
 #        src/tracking.cpp
 #        src/trackingCam.cpp
+#        src/squareDetector.cpp
+#        src/squaresStackOverFlow.cpp
+#        src/onlyRedChannel.cpp
+#        src/faceDetection1.cpp
+#        src/faceDetection2.cpp
+
         src/ardrone/ardrone.cpp
         src/ardrone/ardrone.h
         src/ardrone/command.cpp
